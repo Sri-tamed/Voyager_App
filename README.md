@@ -66,5 +66,5 @@ Voyager aims to provide an all-in-one travel companion experience by combining:
 
 ---
 
-## 🧱 Project Architecture (Recommended)
+## 🧱 Project Architecture (com)
 

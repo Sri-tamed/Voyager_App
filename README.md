@@ -71,3 +71,22 @@ Emergency module supports:
   },
   "message": "I am in danger / lost. Please help."
 }
+
+
+## PROJECT STRUCTURE :
+   Voyager_App/
+│── app/
+│   ├── src/main/java/com/voyager/
+│   │   ├── ui/
+│   │   │   ├── explore/
+│   │   │   ├── map/
+│   │   │   ├── emergency/
+│   │   ├── data/
+│   │   ├── model/
+│   │   ├── repository/
+│   │   ├── utils/
+│   │   └── MainActivity.kt
+│   └── src/main/res/
+│
+└── README.md
+

@@ -1,70 +1,73 @@
-# Voyager 🧭  
-### Smart Tour Planner & Reservation Platform (Android App)
+# Voyager 🧭 (Android - Kotlin)
+### Smart Tourist Guide + Emergency Navigation App
 
-Voyager is a modern Android travel-planning application that helps users plan trips, explore destinations, manage itineraries, and ensure safety during travel using location-aware features and emergency support.  
-This is the **mobile version of Voyager**, built in **Kotlin** for Android.
+Voyager is a Kotlin-based Android application inspired by the **Smart Guide** app, designed to maximize usability for tourists by combining **Explore + Maps + Emergency SOS safety** in one platform.
 
----
-
-## 📱 App Overview
-
-Voyager aims to provide an all-in-one travel companion experience by combining:
-- AI-based travel planning (future scope)
-- Itinerary & trip management
-- Destination recommendations
-- Hotel/reservation browsing
-- Real-time map support
-- Safety emergency mode & SOS flow
+Unlike typical travel guide apps, Voyager focuses strongly on **tourist safety**, enabling users to quickly send emergency alerts, share their last location even in offline conditions, and trigger SOS actions with one tap.
 
 ---
 
-## 🚀 Features
+## 🎯 Motivation / Why Voyager?
+Travelers often face problems like:
+- getting lost in unfamiliar areas
+- losing network connection mid-route
+- needing emergency help quickly
+- needing a reliable offline fallback
 
-### ✅ Core Features
-- **User Authentication**
-  - Secure login/signup system (Firebase-ready)
-- **Home Dashboard**
-  - Quick access to trips, bookings, explore section
-- **Destination Explorer**
-  - Browse destinations with details
-- **Trip Planner**
-  - Create and manage travel plans
-- **Reservation Module**
-  - Hotel / destination booking flow (optional backend/API integration)
-- **Profile Management**
-  - Manage personal details, preferences
-
-### 🛡️ Safety & Security Features (Highlight)
-- **Emergency Mode**
-  - One tap activates emergency support UI
-- **SOS Assistance**
-  - Share location / call for help (planned integration)
-- **Location Tracking**
-  - Uses GPS to assist navigation & safety flows
-- **Geofencing (planned / optional)**
-  - Alert when user enters unsafe zone or crosses boundary
+Voyager addresses these pain points using:
+✅ Map-based navigation  
+✅ Offline last-known location fallback  
+✅ Emergency mode + SOS alert logic  
+✅ Beep-based alert trigger for danger zones  
 
 ---
 
-## 🛠️ Tech Stack
+## 📱 App Modules (Bottom Navigation)
 
-- **Language:** Kotlin
-- **UI:** Jetpack Compose / XML (depending on your version)
-- **Architecture:** MVVM (recommended)
-- **Backend (Optional):**
-  - Firebase Authentication
-  - Firebase Firestore / Realtime Database
-- **Maps & Location:**
-  - Google Maps SDK
-  - FusedLocationProviderClient
-- **Networking:**
-  - Retrofit + Gson
-- **State Management:**
-  - ViewModel + StateFlow / LiveData
-- **Other:**
-  - Material Design Components
+Voyager contains 3 main sections (similar to Smart Guide, but optimized for safety):
+
+### 1️⃣ Explore
+- Explore dashboard similar to **Smart Guide**
+- Discover places, categories, and tourist points
+- Future-ready for AI itinerary & recommendation system
+
+### 2️⃣ Map
+- Live map tracking using device GPS
+- Shareable location button (Send current location)
+- Offline fallback enabled:
+  - If network drops, app still shows **last saved location**
+
+### 3️⃣ Emergency (Voyager’s USP)
+This is the key differentiator.
+
+Emergency module supports:
+- Add/select **Top 5 emergency contacts**
+- Danger zone detection (future scope / optional geofencing)
+- **Beep alert triggered inside map**
+- SOS button:
+  - sends emergency data to selected contacts
 
 ---
 
-## 🧱 Project Architecture (Coming Soon)
+## 🛡️ Emergency + SOS Workflow
 
+### ✅ Flow:
+1. User enables Emergency Mode
+2. App monitors danger zone / unsafe situation triggers
+3. Beep alert plays inside the map UI
+4. User taps **SOS**
+5. SOS sends location payload to top 5 contacts
+6. App displays last-known location even if offline
+
+### 📦 Example SOS Payload (JSON Style)
+```json
+{
+  "user": "Tourist User",
+  "type": "SOS",
+  "timestamp": "2026-01-18T10:30:00",
+  "location": {
+    "lat": 22.5726,
+    "lng": 88.3639
+  },
+  "message": "I am in danger / lost. Please help."
+}

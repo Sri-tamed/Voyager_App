@@ -89,4 +89,126 @@ Emergency module supports:
 │   └── src/main/res/
 │
 └── README.md
+//  new 
+com.example.voyager/
+│
+├── data/
+│   ├── local/
+│   │   ├── datastore/
+│   │   │   ├── UserPreferencesSerializer.kt
+│   │   │   └── EmergencyContactsSerializer.kt
+│   │   └── cache/
+│   │       └── LastLocationCache.kt
+│   │
+│   ├── remote/
+│   │   ├── api/ (Future: Firebase/Supabase)
+│   │   └── dto/
+│   │
+│   ├── model/
+│   │   ├── Destination.kt
+│   │   ├── Experience.kt
+│   │   ├── EmergencyContact.kt
+│   │   ├── LocationData.kt
+│   │   └── DangerZone.kt
+│   │
+│   └── repository/
+│       ├── LocationRepository.kt
+│       ├── EmergencyRepository.kt
+│       ├── DestinationRepository.kt
+│       └── UserRepository.kt
+│
+├── domain/ (Business logic layer)
+│   ├── usecase/
+│   │   ├── TriggerSOSUseCase.kt
+│   │   ├── GetLastLocationUseCase.kt
+│   │   ├── CheckDangerZoneUseCase.kt
+│   │   └── ShareLocationUseCase.kt
+│   │
+│   └── geofence/
+│       ├── GeofencingManager.kt
+│       └── DangerZoneDetector.kt
+│
+├── service/
+│   ├── LocationTrackingService.kt (Foreground service)
+│   ├── EmergencyAlarmService.kt
+│   └── GeofenceTransitionsJobIntentService.kt
+│
+├── ui/
+│   ├── theme/
+│   │   ├── Color.kt
+│   │   ├── Type.kt
+│   │   ├── Theme.kt
+│   │   └── Shapes.kt
+│   │
+│   ├── components/
+│   │   ├── GlassCard.kt
+│   │   ├── GradientCard.kt
+│   │   ├── VoyagerBottomBar.kt
+│   │   ├── VoyagerSearchBar.kt
+│   │   ├── DestinationCard.kt
+│   │   ├── ExperienceCard.kt
+│   │   ├── SOSFloatingButton.kt
+│   │   ├── DangerLevelIndicator.kt
+│   │   ├── PermissionBanner.kt
+│   │   └── EmptyState.kt
+│   │
+│   ├── screens/
+│   │   ├── splash/
+│   │   │   ├── SplashScreen.kt
+│   │   │   └── SplashViewModel.kt
+│   │   │
+│   │   ├── explore/
+│   │   │   ├── ExploreScreen.kt
+│   │   │   ├── ExploreViewModel.kt
+│   │   │   ├── components/
+│   │   │   │   ├── DestinationCarousel.kt
+│   │   │   │   ├── ExperiencesList.kt
+│   │   │   │   └── CategoryChips.kt
+│   │   │   └── detail/
+│   │   │       ├── DestinationDetailScreen.kt
+│   │   │       └── DestinationDetailViewModel.kt
+│   │   │
+│   │   ├── map/
+│   │   │   ├── MapScreen.kt
+│   │   │   ├── MapViewModel.kt
+│   │   │   └── components/
+│   │   │       ├── MapControls.kt
+│   │   │       ├── LocationShareSheet.kt
+│   │   │       └── OfflineBanner.kt
+│   │   │
+│   │   ├── emergency/
+│   │   │   ├── EmergencyScreen.kt
+│   │   │   ├── EmergencyViewModel.kt
+│   │   │   ├── contacts/
+│   │   │   │   ├── EmergencyContactsScreen.kt
+│   │   │   │   └── EmergencyContactsViewModel.kt
+│   │   │   └── components/
+│   │   │       ├── SOSButton.kt
+│   │   │       ├── DangerMeter.kt
+│   │   │       └── QuickActionsGrid.kt
+│   │   │
+│   │   ├── profile/
+│   │   │   ├── ProfileScreen.kt
+│   │   │   ├── ProfileViewModel.kt
+│   │   │   └── settings/
+│   │   │       ├── SettingsScreen.kt
+│   │   │       └── SettingsViewModel.kt
+│   │   │
+│   │   └── permissions/
+│   │       ├── PermissionScreen.kt
+│   │       └── PermissionViewModel.kt
+│   │
+│   └── navigation/
+│       ├── NavGraph.kt
+│       ├── Screen.kt
+│       └── VoyagerNavHost.kt
+│
+├── utils/
+│   ├── Constants.kt
+│   ├── Extensions.kt
+│   ├── PermissionUtils.kt
+│   ├── DateTimeUtils.kt
+│   └── NetworkUtils.kt
+│
+└── VoyagerApplication.kt
 

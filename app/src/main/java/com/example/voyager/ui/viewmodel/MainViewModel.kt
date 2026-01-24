@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.voyager.data.model.*
-import com.example.voyager.data.repository.DangerZoneRepository
 import com.example.voyager.domain.geofence.GeofencingManager
 import com.example.voyager.service.EmergencyAlarmService
 import com.example.voyager.service.LocationManager

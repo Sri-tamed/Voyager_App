@@ -1,40 +1,77 @@
 package com.example.voyager.ui.theme
 
-import androidx.compose.material3.*
+import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import com.example.voyager.data.model.DangerLevel
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-// Earth-toned, premium color palette
-private val DarkBlue = Color(0xFF1B2838)
-private val DeepGrey = Color(0xFF2C3E50)
-private val EarthBrown = Color(0xFF5D4E37)
-private val NeutralGrey = Color(0xFF95A5A6)
-private val SafeGreen = Color(0xFF27AE60)
-private val CautionOrange = Color(0xFFE67E22)
-private val DangerRed = Color(0xFFE74C3C)
-private val EmergencyDeepRed = Color(0xFF8B0000)
+private val VoyagerLightColorScheme = lightColorScheme(
+    primary = VoyagerYellow,
+    onPrimary = TextOnYellow,
+    primaryContainer = GoldLight,
+    onPrimaryContainer = TextPrimary,
 
-private val VoyagerColorScheme = darkColorScheme(
-    primary = DarkBlue,
-    onPrimary = Color.White,
-    secondary = EarthBrown,
-    background = DeepGrey,
-    surface = DarkBlue,
-    onSurface = Color.White
+    secondary = VoyagerOrange,
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFFFE0B2),
+    onSecondaryContainer = Color(0xFF4A3800),
+
+    tertiary = AccentBlue,
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFBBDEFB),
+    onTertiaryContainer = Color(0xFF003C5D),
+
+    error = DangerRed,
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+
+    background = BackgroundPrimary,
+    onBackground = TextPrimary,
+
+    surface = SurfaceElevated,
+    onSurface = TextPrimary,
+    surfaceVariant = BackgroundSecondary,
+    onSurfaceVariant = TextSecondary,
+
+    outline = Color(0xFFBFB5A9),
+    outlineVariant = Color(0xFFE6DED2),
+
+    scrim = OverlayDark,
+    inverseSurface = Color(0xFF353025),
+    inverseOnSurface = Color(0xFFF5EFE7),
+    inversePrimary = GoldMedium,
+
+    surfaceTint = VoyagerYellow
 )
 
 @Composable
-fun VoyagerTheme(content: @Composable () -> Unit) {
+fun VoyagerTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dynamic color is available on Android 12+, but we use custom theme
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = VoyagerLightColorScheme // Only light mode for now
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = BackgroundPrimary.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
+        }
+    }
+
     MaterialTheme(
-        colorScheme = VoyagerColorScheme,
-        typography = Typography(),
+        colorScheme = colorScheme,
+        typography = VoyagerTypography,
+        shapes = VoyagerShapes,
         content = content
     )
-}
-
-fun getSafetyColor(level: DangerLevel): Color = when (level) {
-    DangerLevel.SAFE -> SafeGreen
-    DangerLevel.CAUTION -> CautionOrange
-    DangerLevel.DANGER -> DangerRed
 }

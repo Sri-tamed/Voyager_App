@@ -22,7 +22,7 @@ Voyager addresses these pain points using:
 
 ---
 
-## 📱 App Modules (Bottom Navigation)
+## 📱 Bottom Navigation
 
 Voyager contains 3 main sections (similar to Smart Guide, but optimized for safety):
 

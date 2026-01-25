@@ -1,4 +1,4 @@
-# Voyager 🧭 (Android - Kotlin)
+# Voyager 🧭 ( - Kotlin)
 ### Smart Tourist Guide + Emergency Navigation App
 
 Voyager is a Kotlin-based Android application inspired by the **Smart Guide** app, designed to maximize usability for tourists by combining **Explore + Maps + Emergency SOS safety** in one platform.

@@ -7,7 +7,7 @@ Unlike typical travel guide apps, Voyager focuses strongly on **tourist safety**
 
 ---
 
-## 🎯 Motivation / Why Voyager?
+## Why Voyager?
 Travelers often face problems like:
 - getting lost in unfamiliar areas
 - losing network connection mid-route

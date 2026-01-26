@@ -39,6 +39,12 @@
 
     <!-- Contacts (to select emergency contacts) -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- For offline functionality -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+
 
     <application
         android:allowBackup="true"

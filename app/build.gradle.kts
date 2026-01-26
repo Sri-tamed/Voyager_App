@@ -4,6 +4,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("kotlin-kapt")
+    id("com.google.devtools.ksp") // Remove version from here
 }
 
 android {
@@ -81,7 +82,7 @@ dependencies {
     // Dagger Hilt (Dependency Injection)
     implementation("com.google.dagger:hilt-android:2.50")
     kapt("com.google.dagger:hilt-android-compiler:2.50")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")  // Added this
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
 
     // Kotlinx Serialization (JSON)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
@@ -96,9 +97,17 @@ dependencies {
     // DataStore (for local storage)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // Room Database
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

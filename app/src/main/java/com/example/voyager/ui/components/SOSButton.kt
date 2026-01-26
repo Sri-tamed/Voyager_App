@@ -1,68 +1,66 @@
 package com.example.voyager.ui.components
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.*
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.voyager.ui.theme.CustomShapes
-import com.example.voyager.ui.theme.DangerRed
+import androidx.compose.ui.unit.sp
 import com.example.voyager.ui.theme.EmergencyCritical
 import kotlinx.coroutines.delay
 
 @Composable
 fun SOSButton(
     onSOSTriggered: () -> Unit,
-    modifier: Modifier = Modifier,
-    isActive: Boolean = false,
+    isActive: Boolean,
     requireHoldToActivate: Boolean = true,
-    holdDurationMillis: Long = 2000L
+    modifier: Modifier = Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
     var isPressed by remember { mutableStateOf(false) }
-    var holdProgress by remember { mutableStateOf(0f) }
-    val interactionSource = remember { MutableInteractionSource() }
+    var holdProgress by remember { mutableFloatStateOf(0f) }
+    val holdDuration = 2000L // 2 seconds to activate
 
     // Pulsing animation when active
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val infiniteTransition = rememberInfiniteTransition(label = "sos_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse scale"
+        label = "pulse_scale"
     )
 
     LaunchedEffect(isPressed) {
         if (isPressed && requireHoldToActivate) {
             val startTime = System.currentTimeMillis()
-            while (isPressed) {
+            while (isPressed && holdProgress < 1f) {
                 val elapsed = System.currentTimeMillis() - startTime
-                holdProgress = (elapsed.toFloat() / holdDurationMillis).coerceIn(0f, 1f)
+                holdProgress = (elapsed.toFloat() / holdDuration).coerceIn(0f, 1f)
 
                 if (holdProgress >= 1f) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSOSTriggered()
-                    isPressed = false
-                    break
+                    holdProgress = 0f
                 }
                 delay(16) // ~60fps
             }
+        }
+    }
+
+    LaunchedEffect(isPressed) {
+        if (!isPressed) {
+            // Reset progress when released
             holdProgress = 0f
         }
     }
@@ -70,80 +68,101 @@ fun SOSButton(
     Box(
         modifier = modifier
             .size(200.dp)
-            .scale(if (isActive) pulseScale else 1f),
-        contentAlignment = Alignment.Center
-    ) {
-        // Outer ring (progress indicator when holding)
-        if (requireHoldToActivate && isPressed) {
-            CircularProgressIndicator(
-                progress = { holdProgress },
-                modifier = Modifier.fillMaxSize(),
-                color = Color.White,
-                strokeWidth = 6.dp,
-                trackColor = DangerRed.copy(alpha = 0.3f)
-            )
-        }
-
-        // Main SOS button
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .clip(CustomShapes.SOSButton)
-                .background(if (isActive) EmergencyCritical else DangerRed)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        if (requireHoldToActivate) {
+                            isPressed = true
+                            tryAwaitRelease()
+                            isPressed = false
+                        }
+                    },
+                    onTap = {
                         if (!requireHoldToActivate) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onSOSTriggered()
                         }
                     }
                 )
-                .then(
-                    if (requireHoldToActivate) {
-                        Modifier.pressGestureHelper(
-                            onPress = { isPressed = true },
-                            onRelease = { isPressed = false }
-                        )
-                    } else Modifier
-                ),
-            contentAlignment = Alignment.Center
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Outer ring (progress indicator when holding)
+        if (requireHoldToActivate && isPressed) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 8.dp.toPx()
+                drawCircle(
+                    color = EmergencyCritical.copy(alpha = 0.3f),
+                    radius = size.minDimension / 2 - strokeWidth / 2,
+                    style = Stroke(width = strokeWidth)
+                )
+
+                drawArc(
+                    color = EmergencyCritical,
+                    startAngle = -90f,
+                    sweepAngle = 360f * holdProgress,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth),
+                    topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width - strokeWidth,
+                        size.height - strokeWidth
+                    )
+                )
+            }
+        }
+
+        // Main SOS button
+        Canvas(
+            modifier = Modifier
+                .size(if (isActive) 180.dp * pulseScale else 180.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            // Outer glow when active
+            if (isActive) {
+                drawCircle(
+                    color = EmergencyCritical.copy(alpha = 0.3f),
+                    radius = size.minDimension / 2
+                )
+            }
+
+            // Main circle
+            drawCircle(
+                color = if (isActive || isPressed) EmergencyCritical else EmergencyCritical.copy(alpha = 0.9f),
+                radius = size.minDimension / 2 - 10.dp.toPx()
+            )
+
+            // Inner circle
+            drawCircle(
+                color = Color.White.copy(alpha = 0.1f),
+                radius = size.minDimension / 2 - 30.dp.toPx()
+            )
+        }
+
+        // Text
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "SOS",
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            if (requireHoldToActivate && !isActive) {
                 Text(
-                    text = "SOS",
-                    style = MaterialTheme.typography.displayMedium,
+                    text = if (isPressed) "Hold..." else "Hold to activate",
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Medium
+                )
+            } else if (isActive) {
+                Text(
+                    text = "ACTIVE",
+                    fontSize = 16.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
-
-                if (requireHoldToActivate && !isPressed) {
-                    Text(
-                        text = "Hold to activate",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// Helper modifier for press/release detection
-fun Modifier.pressGestureHelper(
-    onPress: () -> Unit,
-    onRelease: () -> Unit
-) = this.pointerInput(Unit) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent()
-            when (event.type) {
-                PointerEventType.Press -> onPress()
-                PointerEventType.Release -> onRelease()
             }
         }
     }

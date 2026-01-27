@@ -1,7 +1,5 @@
 package com.example.voyager.service
 
-
-
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,7 +10,6 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.example.voyager.MainActivity
 import com.example.voyager.R
 
 /**
@@ -79,20 +76,29 @@ class LocationTrackingService : Service() {
     }
 
     private fun createNotification(): Notification {
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
+        // Get the launcher intent for the app
+        val notificationIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        val pendingIntent = notificationIntent?.let {
+            PendingIntent.getActivity(
+                this,
+                0,
+                it,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Voyager Location Tracking")
             .setContentText("Tracking your location for safety")
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // Update with your icon
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setAutoCancel(false)
             .build()
     }
 }

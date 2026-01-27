@@ -15,13 +15,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.voyager.data.model.Destination
+import com.example.voyager.data.model.Experience
 import com.example.voyager.ui.components.*
 import com.example.voyager.ui.theme.*
+import com.example.voyager.ui.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
-    viewModel: ExploreViewModel,
+    viewModel: MainViewModel,
     onDestinationClick: (String) -> Unit,
     onMapClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,10 +110,17 @@ fun ExploreScreen(
                     containerColor = BackgroundPrimary,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                     indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = VoyagerYellow
-                        )
+                        if (selectedTab < tabPositions.size) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentSize(Alignment.BottomStart)
+                                    .offset(x = tabPositions[selectedTab].left)
+                                    .width(tabPositions[selectedTab].width)
+                                    .height(3.dp)
+                                    .background(color = VoyagerYellow)
+                            )
+                        }
                     }
                 ) {
                     Tab(
@@ -155,7 +164,10 @@ fun ExploreScreen(
                             contentPadding = PaddingValues(horizontal = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            items(uiState.destinations) { destination ->
+                            items(
+                                items = uiState.destinations,
+                                key = { destination: Destination -> destination.id }
+                            ) { destination: Destination ->
                                 DestinationCard(
                                     destination = destination,
                                     onCardClick = { onDestinationClick(destination.id) },
@@ -180,12 +192,24 @@ fun ExploreScreen(
                         )
                     }
 
-                    items(uiState.experiences.take(5)) { experience ->
-                        ExperienceCard(
-                            experience = experience,
-                            onClick = { /* Navigate to experience detail */ },
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                        )
+                    items(
+                        count = minOf(5, uiState.experiences.size),
+                        key = { index: Int ->
+                            if (index < uiState.experiences.size) {
+                                uiState.experiences[index].id
+                            } else {
+                                "experience_$index"
+                            }
+                        }
+                    ) { index: Int ->
+                        if (index < uiState.experiences.size) {
+                            val experience = uiState.experiences[index]
+                            ExperienceCard(
+                                experience = experience,
+                                onClick = { /* Navigate to experience detail */ },
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
 
@@ -203,7 +227,10 @@ fun ExploreScreen(
                             )
                         }
                     } else {
-                        items(uiState.savedDestinations) { destination ->
+                        items(
+                            items = uiState.savedDestinations,
+                            key = { destination: Destination -> destination.id }
+                        ) { destination: Destination ->
                             DestinationCard(
                                 destination = destination,
                                 onCardClick = { onDestinationClick(destination.id) },

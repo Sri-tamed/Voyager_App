@@ -3,54 +3,46 @@ package com.example.voyager.ui.preview
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.voyager.ui.theme.VoyagerTheme
-import com.example.voyager.ui.screens.HomeDashboard
+import com.example.voyager.ui.screens.explore.HomeDashboard
 import com.example.voyager.ui.screens.EmergencyModeScreen
 import com.example.voyager.data.model.DangerLevel
 import com.example.voyager.data.model.UserLocation
+import com.google.android.gms.maps.model.LatLng  // Add this import
 
 @Preview(showBackground = true, name = "Home Dashboard - Safe")
 @Composable
 fun HomeDashboardPreview() {
     VoyagerTheme {
         HomeDashboard(
-            userLocation = UserLocation(
-                latitude = 22.5726,
-                longitude = 88.3639,
-                city = "Kolkata"
-            ),
+            userLocation = LatLng(22.5726, 88.3639),  // Use LatLng instead of UserLocation
+            userCity = "Kolkata",  // Pass city separately
             dangerLevel = DangerLevel.SAFE,
             onEmergencyClick = {}
         )
     }
 }
 
-@Preview(showBackground = true, name = "Home Dashboard - Caution")
+@Preview(showBackground = true, name = "Home Dashboard - Moderate")
 @Composable
-fun HomeDashboardCautionPreview() {
+fun HomeDashboardModeratePreview() {
     VoyagerTheme {
         HomeDashboard(
-            userLocation = UserLocation(
-                latitude = 22.5726,
-                longitude = 88.3639,
-                city = "Kolkata"
-            ),
-            dangerLevel = DangerLevel.CAUTION,
+            userLocation = LatLng(22.5726, 88.3639),
+            userCity = "Kolkata",
+            dangerLevel = DangerLevel.MODERATE,
             onEmergencyClick = {}
         )
     }
 }
 
-@Preview(showBackground = true, name = "Home Dashboard - Danger")
+@Preview(showBackground = true, name = "Home Dashboard - High")
 @Composable
-fun HomeDashboardDangerPreview() {
+fun HomeDashboardHighPreview() {
     VoyagerTheme {
         HomeDashboard(
-            userLocation = UserLocation(
-                latitude = 22.5726,
-                longitude = 88.3639,
-                city = "Kolkata"
-            ),
-            dangerLevel = DangerLevel.DANGER,
+            userLocation = LatLng(22.5726, 88.3639),
+            userCity = "Kolkata",
+            dangerLevel = DangerLevel.HIGH,
             onEmergencyClick = {}
         )
     }
@@ -62,6 +54,22 @@ fun EmergencyPreview() {
     VoyagerTheme {
         EmergencyModeScreen(
             onCancel = {}
+        )
+    }
+}
+
+// Optional: If you want to preview with location permission banners
+@Preview(showBackground = true, name = "Home Dashboard - No Permission")
+@Composable
+fun HomeDashboardNoPermissionPreview() {
+    VoyagerTheme {
+        HomeDashboard(
+            userLocation = LatLng(22.5726, 88.3639),
+            userCity = "Kolkata",
+            dangerLevel = DangerLevel.SAFE,
+            hasLocationPermission = false,  // Show permission banner
+            onEmergencyClick = {},
+            onPermissionClick = {}
         )
     }
 }

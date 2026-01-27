@@ -1,6 +1,5 @@
-package com.example.voyager.ui.screens
+package com.example.voyager.ui.screens.explore
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -8,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
@@ -19,21 +19,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.voyager.ui.components.GlassCard
+import com.example.voyager.data.model.DangerLevel  // Import from data model
+import com.google.android.gms.maps.model.LatLng
+
+// REMOVED the local DangerLevel enum - use the imported one from data.model
 
 @Composable
-fun ExploreHomeScreen(
-    userCity: String = "Kolkata",
+fun HomeDashboard(
+    userLocation: LatLng,
+    userCity: String = "Kolkata", // Made this a parameter instead of hardcoded
+    dangerLevel: DangerLevel = DangerLevel.SAFE, // Now using data model DangerLevel
+    hasLocationPermission: Boolean = true, // Added parameter for permission state
+    onEmergencyClick: () -> Unit,
     onSearchClick: () -> Unit = {},
-    onCountryClick: () -> Unit = {},
-    onPermissionsClick: () -> Unit = {},
-    onExperienceClick: (String) -> Unit = {}
+    onLocationChangeClick: () -> Unit = {},
+    onPermissionClick: () -> Unit = {},
+    onSafetyInfoClick: () -> Unit = {},
+    onCountryClick: (String) -> Unit = {},
+    onExperienceClick: (String) -> Unit = {},
+    onSeeAllClick: () -> Unit = {}
 ) {
-
     val bgCream = Color(0xFFFDF1CE)
     val heroGradient = Brush.verticalGradient(
         colors = listOf(
@@ -48,8 +56,7 @@ fun ExploreHomeScreen(
             .fillMaxSize()
             .background(bgCream)
     ) {
-
-        // ✅ HERO TOP (Theme like 3rd pic)
+        // ✅ HERO TOP SECTION
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -61,8 +68,7 @@ fun ExploreHomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-
-                // Top row: Title + crown icon placeholder
+                // Top row: Title + Emergency button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -82,11 +88,29 @@ fun ExploreHomeScreen(
                         )
                     }
 
+                    // Emergency button with danger level indicator
                     Surface(
-                        modifier = Modifier.size(42.dp),
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clickable { onEmergencyClick() },
                         shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.55f)
-                    ) {}
+                        color = when (dangerLevel) {
+                            DangerLevel.SAFE -> Color.Green.copy(alpha = 0.3f)
+                            DangerLevel.MODERATE -> Color.Yellow.copy(alpha = 0.5f)  // Changed from CAUTION to MODERATE
+                            DangerLevel.HIGH -> Color(0xFFFF6B35).copy(alpha = 0.5f)  // Changed from DANGER to HIGH
+                            DangerLevel.CRITICAL -> Color.Red.copy(alpha = 0.6f)
+                        }
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text(
+                                text = "🚨",
+                                fontSize = 20.sp
+                            )
+                        }
+                    }
                 }
 
                 // ✅ Glass Search Bar
@@ -94,6 +118,7 @@ fun ExploreHomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
+                        .clickable { onSearchClick() }
                 ) {
                     Row(
                         modifier = Modifier
@@ -103,7 +128,7 @@ fun ExploreHomeScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Search,
-                            contentDescription = "search",
+                            contentDescription = "Search",
                             tint = Color(0xFF1A1A1A)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -118,21 +143,21 @@ fun ExploreHomeScreen(
             }
         }
 
-        // ✅ Content feed (SmartGuide layout)
+        // ✅ SCROLLABLE CONTENT SECTION
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState()) // Made scrollable
                 .padding(horizontal = 18.dp)
         ) {
-
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Current location small card
+            // Current location card
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .clickable { onCountryClick() }
+                    .clickable { onLocationChangeClick() }
             ) {
                 Row(
                     modifier = Modifier
@@ -142,7 +167,7 @@ fun ExploreHomeScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.LocationOn,
-                        contentDescription = "location",
+                        contentDescription = "Location",
                         tint = Color(0xFF1A1A1A)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -154,52 +179,125 @@ fun ExploreHomeScreen(
                             color = Color(0xFF1A1A1A)
                         )
                         Text(
-                            text = "Tap to change destination",
-                            fontSize = 12.sp,
-                            color = Color(0xFF1A1A1A).copy(alpha = 0.6f)
+                            text = "Lat: ${String.format("%.4f", userLocation.latitude)}, " +
+                                    "Lng: ${String.format("%.4f", userLocation.longitude)}",
+                            fontSize = 11.sp,
+                            color = Color(0xFF1A1A1A).copy(alpha = 0.5f)
                         )
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "Change",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF6B2EF8)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Permission banner
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEAD9FF)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onPermissionsClick() }
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // Safety status banner (conditional)
+            if (dangerLevel != DangerLevel.SAFE) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when (dangerLevel) {
+                            DangerLevel.MODERATE -> Color(0xFFFFF4E6)      // Changed from CAUTION
+                            DangerLevel.HIGH -> Color(0xFFFFE5E5)         // Changed from DANGER
+                            DangerLevel.CRITICAL -> Color(0xFFFFCDD2)
+                            else -> Color(0xFFEAD9FF)
+                        }
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSafetyInfoClick() }
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Warning,
-                        contentDescription = "warning",
-                        tint = Color(0xFF6B2EF8)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Please allow permissions, so we can guide you.",
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF4B2AA6)
-                    )
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "Warning",
+                            tint = when (dangerLevel) {
+                                DangerLevel.MODERATE -> Color(0xFFFF9800)      // Changed from CAUTION
+                                DangerLevel.HIGH -> Color(0xFFE53935)          // Changed from DANGER
+                                DangerLevel.CRITICAL -> Color(0xFFB71C1C)
+                                else -> Color(0xFF6B2EF8)
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = when (dangerLevel) {
+                                    DangerLevel.MODERATE -> "Exercise Caution"      // Changed from CAUTION
+                                    DangerLevel.HIGH -> "Danger Alert"              // Changed from DANGER
+                                    DangerLevel.CRITICAL -> "Critical Alert"
+                                    else -> "Safe Area"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = when (dangerLevel) {
+                                    DangerLevel.MODERATE -> Color(0xFFE65100)       // Changed from CAUTION
+                                    DangerLevel.HIGH -> Color(0xFFC62828)           // Changed from DANGER
+                                    DangerLevel.CRITICAL -> Color(0xFF8B0000)
+                                    else -> Color(0xFF4B2AA6)
+                                }
+                            )
+                            Text(
+                                text = when (dangerLevel) {
+                                    DangerLevel.MODERATE -> "Stay aware of your surroundings"     // Changed from CAUTION
+                                    DangerLevel.HIGH -> "Avoid this area if possible"             // Changed from DANGER
+                                    DangerLevel.CRITICAL -> "Immediate evacuation recommended"
+                                    else -> "You're in a safe area"
+                                },
+                                fontSize = 12.sp,
+                                color = Color(0xFF333333)
+                            )
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            // Permission banner (conditional - only show if no permission)
+            if (!hasLocationPermission) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEAD9FF)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPermissionClick() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "Warning",
+                            tint = Color(0xFF6B2EF8)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Enable location permissions for better guidance",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = Color(0xFF4B2AA6)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+            }
 
-            // Nearby countries
+            // Nearby countries section
             Text(
                 text = "Nearby countries",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF111111)
             )
-
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
@@ -208,15 +306,16 @@ fun ExploreHomeScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                NearbyCountryCard("Nepal")
-                NearbyCountryCard("Myanmar")
-                NearbyCountryCard("Bhutan")
-                NearbyCountryCard("Sri Lanka")
+                NearbyCountryCard("Nepal", "🇳🇵") { onCountryClick("Nepal") }
+                NearbyCountryCard("Myanmar", "🇲🇲") { onCountryClick("Myanmar") }
+                NearbyCountryCard("Bhutan", "🇧🇹") { onCountryClick("Bhutan") }
+                NearbyCountryCard("Sri Lanka", "🇱🇰") { onCountryClick("Sri Lanka") }
+                NearbyCountryCard("Bangladesh", "🇧🇩") { onCountryClick("Bangladesh") }
             }
 
             Spacer(modifier = Modifier.height(22.dp))
 
-            // Experiences
+            // Experiences section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -233,7 +332,7 @@ fun ExploreHomeScreen(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF111111).copy(alpha = 0.65f),
-                    modifier = Modifier.clickable { }
+                    modifier = Modifier.clickable { onSeeAllClick() }
                 )
             }
 
@@ -241,25 +340,56 @@ fun ExploreHomeScreen(
 
             ExperienceCard(
                 title = "Kolkata: City Highlights",
-                price = "From ₹7374",
-                rating = "4.7"
-            ) { onExperienceClick("Kolkata: City Highlights") }
+                price = "From ₹7,374",
+                rating = "4.7",
+                reviews = "142"
+            ) { onExperienceClick("City Highlights") }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             ExperienceCard(
                 title = "Kolkata: Spirituality & Temples",
-                price = "From ₹7592",
-                rating = "4.4"
-            ) { onExperienceClick("Kolkata: Spirituality & Temples") }
+                price = "From ₹7,592",
+                rating = "4.4",
+                reviews = "98"
+            ) { onExperienceClick("Spirituality & Temples") }
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            ExperienceCard(
+                title = "Heritage Walking Tour",
+                price = "From ₹3,500",
+                rating = "4.8",
+                reviews = "256"
+            ) { onExperienceClick("Heritage Walking Tour") }
+
+            Spacer(modifier = Modifier.height(80.dp)) // Bottom padding for navigation
         }
     }
 }
 
+// ✅ GlassCard Component (you'll need to add this)
 @Composable
-private fun NearbyCountryCard(title: String) {
+fun GlassCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.4f),
+        shadowElevation = 0.dp
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun NearbyCountryCard(
+    title: String,
+    flag: String = "🏳️",
+    onClick: () -> Unit = {}
+) {
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -267,22 +397,39 @@ private fun NearbyCountryCard(title: String) {
         modifier = Modifier
             .width(180.dp)
             .height(120.dp)
+            .clickable { onClick() }
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFAC31C).copy(alpha = 0.25f))
-            )
-            Text(
-                text = title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+                    .background(Color(0xFFFAC31C).copy(alpha = 0.25f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = flag,
+                    fontSize = 24.sp
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF111111)
+                )
+                Text(
+                    text = "Explore",
+                    fontSize = 12.sp,
+                    color = Color(0xFF6B6B6B)
+                )
+            }
         }
     }
 }
@@ -292,6 +439,7 @@ private fun ExperienceCard(
     title: String,
     price: String,
     rating: String,
+    reviews: String = "0",
     onClick: () -> Unit
 ) {
     Card(
@@ -313,8 +461,21 @@ private fun ExperienceCard(
                 modifier = Modifier
                     .size(68.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFFFDEBB9))
-            )
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFFAC31C),
+                                Color(0xFFFDEBB9)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🏛️",
+                    fontSize = 32.sp
+                )
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -323,21 +484,38 @@ private fun ExperienceCard(
                     text = title,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 2
+                    maxLines = 2,
+                    color = Color(0xFF111111)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = price,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF6B6B6B)
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "⭐",
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = " $rating",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF111111)
+                    )
+                }
                 Text(
-                    text = "★ $rating",
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF111111)
+                    text = "($reviews)",
+                    fontSize = 11.sp,
+                    color = Color(0xFF999999)
                 )
             }
         }

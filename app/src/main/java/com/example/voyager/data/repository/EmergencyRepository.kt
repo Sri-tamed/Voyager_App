@@ -28,7 +28,7 @@ class EmergencyRepository @Inject constructor(
     suspend fun triggerSOS(
         emergencyContacts: List<EmergencyContact>,
         userId: String,
-        dangerLevel: DangerLevel = DangerLevel.DANGER
+        dangerLevel: DangerLevel = DangerLevel.HIGH
     ): Result<Unit> {
         return try {
             // Get current location

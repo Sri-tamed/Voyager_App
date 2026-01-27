@@ -44,3 +44,6 @@ val AccentPurple = Color(0xFF9C27B0)
 val ShadowLight = Color(0x14000000)
 val ShadowMedium = Color(0x29000000)
 val OverlayDark = Color(0x80000000)
+
+val VoyagerCream = Color(0xFFFFF8E7)
+val TextMuted = Color(0xFF9E9E9E)

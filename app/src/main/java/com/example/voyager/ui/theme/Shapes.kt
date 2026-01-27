@@ -26,4 +26,5 @@ object CustomShapes {
     val BottomSheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val DestinationCard = RoundedCornerShape(18.dp)
     val SOSButton = RoundedCornerShape(50) // Fully rounded
+    val small = RoundedCornerShape(8.dp)
 }

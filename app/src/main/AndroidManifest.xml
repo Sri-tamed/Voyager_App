@@ -2,49 +2,29 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.voyager">
 
-    <!-- Declare telephony as optional (fixes telephony permission warnings) -->
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
 
-    <!-- OFFLINE SOS CRITICAL PERMISSIONS -->
-
-    <!-- Location permissions (for last-known location cache) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-
-    <!-- SMS permission (OPTIONAL but enables offline SOS) -->
-    <!-- Play Store NOTE: This requires SMS policy declaration -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
-
-    <!-- Phone/Call permissions (for emergency calling) -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-
-    <!-- Network state (to detect offline mode) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Vibration for SOS alerts -->
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- Foreground service for location tracking -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-
-    <!-- Notifications for emergency alerts -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Contacts (to select emergency contacts) -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- For offline functionality -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-
-
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:allowBackup="true"
@@ -67,43 +47,16 @@
 
         <!-- Location Tracking Foreground Service -->
         <service
-            android:name="com.example.voyager.service.LocationTrackingService"
+            android:name=".service.LocationTrackingService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
 
         <!-- Emergency Alarm Service -->
         <service
-            android:name="com.example.voyager.service.EmergencyAlarmService"
+            android:name=".service.EmergencyAlarmService"
             android:enabled="true"
             android:exported="false" />
 
-        <!-- Google Maps API Key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
-
     </application>
 </manifest>
-    <!--
-    PLAY STORE COMPLIANCE NOTES:
-    1. SMS PERMISSION POLICY:
-       - Voyager uses SMS ONLY for emergency alerts when offline
-       - Declaration required in Play Console:
-         "Core functionality: Sending emergency SOS alerts to pre-configured
-          contacts when user is in danger and network is unavailable"
-       - This is a legitimate use case under Play Store SMS policy
-
-    2. BACKGROUND LOCATION:
-       - Used only for safety tracking when user explicitly enables it
-       - Must show persistent notification when tracking
-
-    3. CALL_PHONE:
-       - Used only for emergency calling
-       - Always shows confirmation before calling
-
-    4. Make SMS permission OPTIONAL:
-       - App works without SMS (uses share intent)
-       - SMS enables better offline functionality
-       - Request permission with clear explanation of offline benefits
-    -->

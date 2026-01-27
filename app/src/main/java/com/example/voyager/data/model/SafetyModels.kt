@@ -10,21 +10,8 @@ data class DangerZone(
     val dangerLevel: DangerLevel
 )
 
-enum class DangerLevel {
-    SAFE, CAUTION, DANGER
-}
 
-data class UserLocation(
-    val latitude: Double,
-    val longitude: Double,
-    val city: String = "Unknown Location"
-)
 
-sealed class EmergencyState {
-    object Inactive : EmergencyState()
-    data class Active(val triggeredBy: TriggerSource) : EmergencyState()
-}
 
-enum class TriggerSource {
-    MANUAL, GEOFENCE
-}
+
+

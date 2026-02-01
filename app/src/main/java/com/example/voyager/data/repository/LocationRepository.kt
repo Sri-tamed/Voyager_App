@@ -3,8 +3,8 @@ package com.example.voyager.data.repository
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Geocoder
+import android.os.Build
 import android.os.Looper
-import com.example.voyager.data.local.cache.LastLocationCache
 import com.example.voyager.data.model.LocationData
 import com.google.android.gms.location.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -121,14 +121,30 @@ class LocationRepository @Inject constructor(
      */
     suspend fun getAddressFromLocation(latitude: Double, longitude: Double): String? {
         return try {
-            @Suppress("DEPRECATION")
-            val addresses = geocoder.getFromLocation(latitude, longitude, 1)
-            addresses?.firstOrNull()?.let { address ->
-                listOfNotNull(
-                    address.locality,
-                    address.adminArea,
-                    address.countryName
-                ).joinToString(", ")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Use new API for Android 13+
+                var addressResult: String? = null
+                geocoder.getFromLocation(latitude, longitude, 1) { addresses ->
+                    addressResult = addresses.firstOrNull()?.let { address ->
+                        listOfNotNull(
+                            address.locality,
+                            address.adminArea,
+                            address.countryName
+                        ).joinToString(", ")
+                    }
+                }
+                addressResult
+            } else {
+                // Use deprecated API for older versions
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(latitude, longitude, 1)
+                addresses?.firstOrNull()?.let { address ->
+                    listOfNotNull(
+                        address.locality,
+                        address.adminArea,
+                        address.countryName
+                    ).joinToString(", ")
+                }
             }
         } catch (e: Exception) {
             null
@@ -151,6 +167,7 @@ class LocationRepository @Inject constructor(
 /**
  * Simple cache for last known location using SharedPreferences
  */
+@Singleton
 class LastLocationCache @Inject constructor(
     @ApplicationContext private val context: Context
 ) {

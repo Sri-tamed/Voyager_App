@@ -21,6 +21,7 @@ import javax.inject.Singleton
 
 /**
  * OFFLINE-FIRST Emergency Repository
+ *
  * This is your app's TRUE USP - works even without internet
  *
  * Features:
@@ -33,7 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class OfflineEmergencyRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val lastLocationCache: LastLocationCache,
+    private val locationRepository: LocationRepository,  // Use LocationRepository
     private val emergencyContactsStore: EmergencyContactsStore
 ) {
     private val _isSOSActive = MutableStateFlow(false)
@@ -52,11 +53,11 @@ class OfflineEmergencyRepository @Inject constructor(
      */
     suspend fun triggerOfflineSOS(
         userId: String,
-        dangerLevel: DangerLevel = DangerLevel.DANGER
+        dangerLevel: DangerLevel = DangerLevel.HIGH
     ): Result<SOSResult> {
         return try {
             // Get last known location (ALWAYS available, even offline)
-            val location = lastLocationCache.get()
+            val location = locationRepository.getLastKnownLocation()
                 ?: return Result.failure(Exception("No location data available"))
 
             // Get emergency contacts from local storage

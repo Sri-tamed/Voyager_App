@@ -1,7 +1,5 @@
 package com.example.voyager.ui.components
 
-
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -43,7 +41,10 @@ fun VoyagerBottomBar(navController: NavController) {
                 onClick = {
                     navController.navigate(item.route) {
                         launchSingleTop = true
-                        popUpTo(navController.graph.startDestinationId)
+                        popUpTo(navController.graph.startDestinationId) {
+                            saveState = true
+                        }
+                        restoreState = true
                     }
                 },
                 icon = {

@@ -16,6 +16,8 @@ class EmergencyAlarmService : Service() {
 
     companion object {
         private const val TAG = "EmergencyAlarmService"
+        const val ACTION_TRIGGER_SOS = "com.example.voyager.ACTION_TRIGGER_SOS"
+        const val ACTION_CANCEL_SOS = "com.example.voyager.ACTION_CANCEL_SOS"
     }
 
     /**
@@ -74,10 +76,5 @@ class EmergencyAlarmService : Service() {
     private fun cancelEmergencyAlert() {
         // TODO: Implement cancel logic
         Log.d(TAG, "Canceling emergency alert")
-    }
-
-    companion object {
-        const val ACTION_TRIGGER_SOS = "com.example.voyager.ACTION_TRIGGER_SOS"
-        const val ACTION_CANCEL_SOS = "com.example.voyager.ACTION_CANCEL_SOS"
     }
 }

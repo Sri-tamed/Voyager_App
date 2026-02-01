@@ -10,13 +10,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.voyager.data.model.DangerLevel
+import com.example.voyager.data.model.EmergencyContact
 import com.example.voyager.ui.components.*
 import com.example.voyager.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmergencyScreen(
     viewModel: EmergencyViewModel,
@@ -33,8 +37,9 @@ fun EmergencyScreen(
                     colors = listOf(
                         when (uiState.dangerLevel) {
                             DangerLevel.SAFE -> SafeGreen.copy(alpha = 0.1f)
-                            DangerLevel.CAUTION -> CautionYellow.copy(alpha = 0.15f)
-                            DangerLevel.DANGER -> DangerRed.copy(alpha = 0.1f)
+                            DangerLevel.MODERATE -> CautionYellow.copy(alpha = 0.15f)
+                            DangerLevel.HIGH -> DangerRed.copy(alpha = 0.1f)
+                            else -> BackgroundPrimary
                         },
                         BackgroundPrimary
                     )
@@ -59,8 +64,9 @@ fun EmergencyScreen(
                         modifier = Modifier.size(48.dp),
                         tint = when (uiState.dangerLevel) {
                             DangerLevel.SAFE -> SafeGreen
-                            DangerLevel.CAUTION -> CautionYellow
-                            DangerLevel.DANGER -> DangerRed
+                            DangerLevel.MODERATE -> CautionYellow
+                            DangerLevel.HIGH -> DangerRed
+                            else -> TextSecondary
                         }
                     )
 
@@ -122,7 +128,7 @@ fun EmergencyScreen(
                                 colors = CardDefaults.cardColors(
                                     containerColor = EmergencyCritical.copy(alpha = 0.1f)
                                 ),
-                                shape = CustomShapes.medium
+                                shape = MaterialTheme.shapes.medium
                             ) {
                                 Text(
                                     text = "🚨 SOS ACTIVE\n${uiState.sosStatusMessage}",
@@ -140,7 +146,7 @@ fun EmergencyScreen(
                                 colors = CardDefaults.cardColors(
                                     containerColor = CautionYellow.copy(alpha = 0.1f)
                                 ),
-                                shape = CustomShapes.medium
+                                shape = MaterialTheme.shapes.medium
                             ) {
                                 Row(
                                     modifier = Modifier.padding(16.dp),
@@ -166,7 +172,7 @@ fun EmergencyScreen(
                     // Offline capability badge
                     if (!uiState.isOnline) {
                         Surface(
-                            shape = CustomShapes.small,
+                            shape = MaterialTheme.shapes.small,
                             color = SafeGreen.copy(alpha = 0.15f)
                         ) {
                             Row(
@@ -216,7 +222,7 @@ fun EmergencyScreen(
                     // Offline badge
                     if (!uiState.isOnline) {
                         Surface(
-                            shape = CustomShapes.extraSmall,
+                            shape = MaterialTheme.shapes.extraSmall,
                             color = DangerRed.copy(alpha = 0.1f)
                         ) {
                             Row(
@@ -314,7 +320,7 @@ fun OfflineWarningBanner(
         colors = CardDefaults.cardColors(
             containerColor = CautionYellow.copy(alpha = 0.15f)
         ),
-        shape = CustomShapes.medium
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(
             modifier = Modifier
@@ -366,8 +372,9 @@ fun DangerLevelCard(
 ) {
     val (color, label, icon) = when (dangerLevel) {
         DangerLevel.SAFE -> Triple(SafeGreen, "Safe Area", Icons.Default.CheckCircle)
-        DangerLevel.CAUTION -> Triple(CautionYellow, "Caution Required", Icons.Default.Warning)
-        DangerLevel.DANGER -> Triple(DangerRed, "Danger Zone", Icons.Default.Error)
+        DangerLevel.MODERATE -> Triple(CautionYellow, "Caution Required", Icons.Default.Warning)
+        DangerLevel.HIGH -> Triple(DangerRed, "Danger Zone", Icons.Default.Error)
+        else -> Triple(TextSecondary, "Unknown", Icons.Default.Help)
     }
 
     Card(
@@ -375,7 +382,7 @@ fun DangerLevelCard(
         colors = CardDefaults.cardColors(
             containerColor = color.copy(alpha = 0.12f)
         ),
-        shape = CustomShapes.medium
+        shape = MaterialTheme.shapes.medium
     ) {
         Row(
             modifier = Modifier
@@ -427,9 +434,10 @@ fun DangerLevelCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickActionCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -444,7 +452,7 @@ fun QuickActionCard(
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
         ),
-        shape = CustomShapes.medium
+        shape = MaterialTheme.shapes.medium
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -477,13 +485,13 @@ fun QuickActionCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp),
-                    shape = CustomShapes.extraSmall,
+                    shape = MaterialTheme.shapes.extraSmall,
                     color = SafeGreen
                 ) {
                     Icon(
                         imageVector = Icons.Default.SignalCellular4Bar,
                         contentDescription = "Works offline",
-                        tint = androidx.compose.ui.graphics.Color.White,
+                        tint = Color.White,
                         modifier = Modifier
                             .padding(4.dp)
                             .size(12.dp)
@@ -496,9 +504,9 @@ fun QuickActionCard(
 
 @Composable
 fun EmergencyContactsPreview(
-    contacts: List<com.example.voyager.data.model.EmergencyContact>,
+    contacts: List<EmergencyContact>,
     onManageClick: () -> Unit,
-    onCallContact: (com.example.voyager.data.model.EmergencyContact) -> Unit = {},
+    onCallContact: (EmergencyContact) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -527,7 +535,7 @@ fun EmergencyContactsPreview(
                 colors = CardDefaults.cardColors(
                     containerColor = DangerRed.copy(alpha = 0.1f)
                 ),
-                shape = CustomShapes.medium
+                shape = MaterialTheme.shapes.medium
             ) {
                 Column(
                     modifier = Modifier
@@ -578,7 +586,7 @@ fun EmergencyContactsPreview(
 
 @Composable
 fun EmergencyContactCard(
-    contact: com.example.voyager.data.model.EmergencyContact,
+    contact: EmergencyContact,
     onCall: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -587,7 +595,7 @@ fun EmergencyContactCard(
         colors = CardDefaults.cardColors(
             containerColor = SurfaceElevated
         ),
-        shape = CustomShapes.medium
+        shape = MaterialTheme.shapes.medium
     ) {
         Row(
             modifier = Modifier
@@ -602,7 +610,7 @@ fun EmergencyContactCard(
                 modifier = Modifier.weight(1f)
             ) {
                 Surface(
-                    shape = CustomShapes.SOSButton,
+                    shape = MaterialTheme.shapes.large,
                     color = VoyagerYellow.copy(alpha = 0.2f)
                 ) {
                     Icon(

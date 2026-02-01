@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack  // Add this import
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.SignalCellularAlt
@@ -24,16 +25,20 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.voyager.data.model.UserLocation
-import com.example.voyager.ui.theme.VoyagerColors // ⭐ IMPORTANT IMPORT
+import com.example.voyager.ui.theme.VoyagerColors
+import com.google.android.gms.maps.model.LatLng
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
+@OptIn(ExperimentalMaterial3Api::class)  // Add this annotation to fix experimental API warning
 @Composable
 fun MapScreen(
-    userLocation: UserLocation?
+    userLocation: LatLng?,  // Changed from UserLocation? to LatLng?
+    userCity: String = "",  // Add city parameter
+    onBackClick: () -> Unit  // Add back click parameter
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -45,100 +50,115 @@ fun MapScreen(
         Configuration.getInstance().userAgentValue = context.packageName
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(VoyagerColors.CreamBackground)
-    ) {
-        // OSMDroid Map View
-        AndroidView(
-            factory = { ctx ->
-                MapView(ctx).apply {
-                    mapView = this
+    Scaffold(  // Use Scaffold for proper structure
+        topBar = {
+            TopAppBar(
+                title = { Text("Live Map") },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")  // Fixed: Icons.Filled.ArrowBack
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(VoyagerColors.CreamBackground)
+        ) {
+            // OSMDroid Map View
+            AndroidView(
+                factory = { ctx ->
+                    MapView(ctx).apply {
+                        mapView = this
 
-                    // Configure map
-                    setTileSource(TileSourceFactory.MAPNIK)
-                    setMultiTouchControls(true)
-                    controller.setZoom(15.0)
+                        // Configure map
+                        setTileSource(TileSourceFactory.MAPNIK)
+                        setMultiTouchControls(true)
+                        controller.setZoom(15.0)
 
-                    // Set user location if available
+                        // Set user location if available
+                        userLocation?.let { location ->
+                            val point = GeoPoint(location.latitude, location.longitude)
+                            controller.setCenter(point)
+
+                            // Add marker
+                            val marker = Marker(this)
+                            marker.position = point
+                            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            marker.title = "You are here"
+                            overlays.add(marker)
+                        }
+                    }
+                },
+                update = { map ->
                     userLocation?.let { location ->
                         val point = GeoPoint(location.latitude, location.longitude)
-                        controller.setCenter(point)
-
-                        // Add marker
-                        val marker = Marker(this)
-                        marker.position = point
-                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        marker.title = "You are here"
-                        overlays.add(marker)
+                        map.controller.setCenter(point)
                     }
-                }
-            },
-            update = { map ->
-                userLocation?.let { location ->
-                    val point = GeoPoint(location.latitude, location.longitude)
-                    map.controller.setCenter(point)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Lifecycle management
-        DisposableEffect(lifecycleOwner) {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_RESUME -> mapView?.onResume()
-                    Lifecycle.Event.ON_PAUSE -> mapView?.onPause()
-                    Lifecycle.Event.ON_DESTROY -> mapView?.onDetach()
-                    else -> {}
-                }
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-            }
-        }
-
-        // Offline banner at top
-        if (isOffline) {
-            OfflineBanner()
-        }
-
-        // Floating action buttons at bottom right
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            FloatingMapButton(
-                icon = Icons.Default.Share,
-                label = "Share Location",
-                onClick = { /* Share location logic */ }
+                },
+                modifier = Modifier.fillMaxSize()
             )
 
-            FloatingMapButton(
-                icon = Icons.Default.MyLocation,
-                label = "Recenter",
-                onClick = {
-                    userLocation?.let { location ->
-                        mapView?.controller?.animateTo(
-                            GeoPoint(location.latitude, location.longitude)
-                        )
+            // Lifecycle management
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> mapView?.onResume()
+                        Lifecycle.Event.ON_PAUSE -> mapView?.onPause()
+                        Lifecycle.Event.ON_DESTROY -> mapView?.onDetach()
+                        else -> {}
                     }
                 }
-            )
-        }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
 
-        // Location info card at bottom
-        userLocation?.let {
-            LocationInfoCard(
-                location = it,
+            // Offline banner at top
+            if (isOffline) {
+                OfflineBanner()
+            }
+
+            // Floating action buttons at bottom right
+            Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(20.dp)
-            )
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FloatingMapButton(
+                    icon = Icons.Default.Share,
+                    label = "Share Location",
+                    onClick = { /* Share location logic */ }
+                )
+
+                FloatingMapButton(
+                    icon = Icons.Default.MyLocation,
+                    label = "Recenter",
+                    onClick = {
+                        userLocation?.let { location ->
+                            mapView?.controller?.animateTo(
+                                GeoPoint(location.latitude, location.longitude)
+                            )
+                        }
+                    }
+                )
+            }
+
+            // Location info card at bottom
+            userLocation?.let { location ->
+                LocationInfoCard(
+                    location = location,
+                    city = userCity,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(20.dp)
+                )
+            }
         }
     }
 }
@@ -194,6 +214,7 @@ private fun OfflineBanner() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)  // Add this for FloatingActionButton
 @Composable
 private fun FloatingMapButton(
     icon: ImageVector,
@@ -223,7 +244,8 @@ private fun FloatingMapButton(
 
 @Composable
 private fun LocationInfoCard(
-    location: UserLocation,
+    location: LatLng,  // Changed from UserLocation to LatLng
+    city: String,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -256,17 +278,11 @@ private fun LocationInfoCard(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = location.city ?: "Unknown",
+                        text = city,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
                         color = VoyagerColors.DarkCharcoal
-                    )
-
-                    Text(
-                        text = location.country ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = VoyagerColors.MediumGray
                     )
                 }
 

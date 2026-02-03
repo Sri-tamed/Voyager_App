@@ -1,501 +1,628 @@
 package com.example.voyager.ui.screens.emergency
 
+import android.Manifest
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.voyager.emergency.EmergencyManager
 import com.example.voyager.data.model.DangerLevel
 import com.example.voyager.data.model.EmergencyContact
-import com.example.voyager.ui.components.*
-import com.example.voyager.ui.theme.*
+import com.example.voyager.data.model.EmergencyEvent
+import com.example.voyager.ui.theme.VoyagerColors
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * INTEGRATED Emergency Screen - Fixed for compilation
+ * Combines your beautiful UI with system-level reliability
+ */
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun EmergencyScreen(
-    viewModel: EmergencyViewModel,
-    onManageContactsClick: () -> Unit,
-    modifier: Modifier = Modifier
+    emergencyManager: EmergencyManager, // Direct injection
+    onCancel: () -> Unit,
+    viewModel: EmergencyViewModel = viewModel(
+        factory = EmergencyViewModelFactory(emergencyManager)
+    )
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Permission handling
+    val permissionsState = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.SEND_SMS,
+        )
+    )
+
+    LaunchedEffect(permissionsState.allPermissionsGranted) {
+        viewModel.updatePermissionsState(permissionsState.allPermissionsGranted)
+    }
+
+    // Show permission request if needed
+    if (!permissionsState.allPermissionsGranted) {
+        PermissionRequestScreen(
+            onRequestPermissions = { permissionsState.launchMultiplePermissionRequest() },
+            onCancel = onCancel
+        )
+        return
+    }
+
+    // Main Emergency UI
+    if (uiState.contacts.isEmpty()) {
+        NoContactsScreen(
+            onAddContacts = { /* Navigate to add contacts */ },
+            onCancel = onCancel
+        )
+    } else {
+        EmergencyModeScreenIntegrated(
+            uiState = uiState,
+            onSosClick = { viewModel.triggerSos(DangerLevel.HIGH) },
+            onCancel = {
+                viewModel.stopEmergencyMode()
+                onCancel()
+            }
+        )
+    }
+}
+
+@Composable
+private fun EmergencyModeScreenIntegrated(
+    uiState: EmergencyUiState,
+    onSosClick: () -> Unit,
+    onCancel: () -> Unit
+) {
+    // Pulsing animation for SOS button
+    val infiniteTransition = rememberInfiniteTransition(label = "sosButton")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sosScale"
+    )
+
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        when (uiState.dangerLevel) {
-                            DangerLevel.SAFE -> SafeGreen.copy(alpha = 0.1f)
-                            DangerLevel.MODERATE -> CautionYellow.copy(alpha = 0.15f)
-                            DangerLevel.HIGH -> DangerRed.copy(alpha = 0.1f)
-                            else -> BackgroundPrimary
-                        },
-                        BackgroundPrimary
+                        VoyagerColors.CreamBackground,
+                        VoyagerColors.LightBeige
                     )
                 )
             )
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 40.dp, horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            item {
-                // Header
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = "Safety",
-                        modifier = Modifier.size(48.dp),
-                        tint = when (uiState.dangerLevel) {
-                            DangerLevel.SAFE -> SafeGreen
-                            DangerLevel.MODERATE -> CautionYellow
-                            DangerLevel.HIGH -> DangerRed
-                            else -> TextSecondary
-                        }
-                    )
+            Spacer(modifier = Modifier.height(40.dp))
 
-                    Text(
-                        text = "Emergency Center",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
+            // Emergency Header
+            EmergencyHeader(isActive = uiState.isEmergencyModeActive)
 
-                    Text(
-                        text = "Works even offline",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = VoyagerYellow,
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Status Card with real data
+            EmergencyStatusCard(
+                dangerLevel = uiState.currentDangerLevel,
+                contactsCount = uiState.contacts.size,
+                lastEvent = uiState.recentEvents.firstOrNull()
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // SOS Button - NOW ACTUALLY WORKS!
+            SOSButton(
+                scale = scale,
+                onClick = onSosClick,
+                isInProgress = uiState.isSosInProgress,
+                enabled = !uiState.isSosInProgress
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Emergency Actions
+            EmergencyActionsRow(
+                contacts = uiState.contacts.take(2)
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Cancel Button
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = VoyagerColors.DarkCharcoal
+                )
+            ) {
+                Text(
+                    text = "Cancel Emergency",
+                    style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     )
-                }
-            }
-
-            // OFFLINE STATUS INDICATOR
-            if (!uiState.isOnline) {
-                item {
-                    OfflineWarningBanner(
-                        hasLastKnownLocation = uiState.hasLastKnownLocation,
-                        hasSmsCapability = uiState.hasSmsPermission
-                    )
-                }
-            }
-
-            item {
-                // Danger level indicator
-                DangerLevelCard(
-                    dangerLevel = uiState.dangerLevel,
-                    locationName = uiState.currentLocationName,
-                    isLocationCached = uiState.isLocationCached
                 )
             }
 
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            item {
-                // SOS Button with offline capability indicator
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    SOSButton(
-                        onSOSTriggered = { viewModel.triggerOfflineSOS() },
-                        isActive = uiState.isSOSActive,
-                        requireHoldToActivate = true
-                    )
-
-                    // Status messages
-                    when {
-                        uiState.isSOSActive -> {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = EmergencyCritical.copy(alpha = 0.1f)
-                                ),
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Text(
-                                    text = "🚨 SOS ACTIVE\n${uiState.sosStatusMessage}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = EmergencyCritical,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
-                        }
-
-                        uiState.sosQueuedCount > 0 -> {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = CautionYellow.copy(alpha = 0.1f)
-                                ),
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Schedule,
-                                        contentDescription = "Queued",
-                                        tint = CautionYellow
-                                    )
-                                    Text(
-                                        text = "${uiState.sosQueuedCount} SOS alert(s) queued\nWill send when online",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = TextPrimary,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Offline capability badge
-                    if (!uiState.isOnline) {
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = SafeGreen.copy(alpha = 0.15f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SignalCellular4Bar,
-                                    contentDescription = "Offline capable",
-                                    tint = SafeGreen,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = if (uiState.hasSmsPermission)
-                                        "SMS available offline"
-                                    else
-                                        "Call available offline",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = SafeGreen,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            item {
-                // Quick actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Quick Actions",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    // Offline badge
-                    if (!uiState.isOnline) {
-                        Surface(
-                            shape = MaterialTheme.shapes.extraSmall,
-                            color = DangerRed.copy(alpha = 0.1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SignalCellularConnectedNoInternet0Bar,
-                                    contentDescription = "Offline",
-                                    tint = DangerRed,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = "OFFLINE",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = DangerRed,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickActionCard(
-                        icon = Icons.Default.Phone,
-                        label = "Call Local\nEmergency",
-                        onClick = { viewModel.callLocalEmergency() },
-                        modifier = Modifier.weight(1f),
-                        isOfflineCapable = true
-                    )
-
-                    QuickActionCard(
-                        icon = Icons.Default.Share,
-                        label = "Share\nLocation",
-                        onClick = { viewModel.shareLocation() },
-                        modifier = Modifier.weight(1f),
-                        isOfflineCapable = !uiState.isOnline && uiState.hasSmsPermission
-                    )
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickActionCard(
-                        icon = Icons.Default.Contacts,
-                        label = "Emergency\nContacts",
-                        onClick = onManageContactsClick,
-                        modifier = Modifier.weight(1f),
-                        isOfflineCapable = true
-                    )
-
-                    QuickActionCard(
-                        icon = Icons.Default.VolumeUp,
-                        label = "Sound\nAlarm",
-                        onClick = { viewModel.triggerLocalAlarm() },
-                        modifier = Modifier.weight(1f),
-                        isOfflineCapable = true
-                    )
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            item {
-                // Emergency contacts preview
-                EmergencyContactsPreview(
-                    contacts = uiState.emergencyContacts,
-                    onManageClick = onManageContactsClick,
-                    onCallContact = { contact -> viewModel.callContact(contact) }
-                )
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-fun OfflineWarningBanner(
-    hasLastKnownLocation: Boolean,
-    hasSmsCapability: Boolean,
-    modifier: Modifier = Modifier
+private fun EmergencyHeader(isActive: Boolean) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Warning icon with pulsing
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(VoyagerColors.EmergencyRed.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Warning,
+                contentDescription = "Emergency",
+                tint = VoyagerColors.EmergencyRed,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = if (isActive) "Emergency Mode Active" else "Emergency Mode",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = VoyagerColors.DarkCharcoal,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = if (isActive)
+                "Your emergency contacts will be notified"
+            else
+                "Press SOS to alert emergency contacts",
+            style = MaterialTheme.typography.bodyLarge,
+            color = VoyagerColors.MediumGray,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun EmergencyStatusCard(
+    dangerLevel: DangerLevel,
+    contactsCount: Int,
+    lastEvent: EmergencyEvent?
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = CautionYellow.copy(alpha = 0.15f)
+            containerColor = VoyagerColors.WarmIvory
         ),
-        shape = MaterialTheme.shapes.medium
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(24.dp)
         ) {
+            // Danger Level
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.SignalCellularConnectedNoInternet0Bar,
-                    contentDescription = "Offline",
-                    tint = CautionYellow,
-                    modifier = Modifier.size(24.dp)
-                )
+                Column {
+                    Text(
+                        text = "Current Status",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = VoyagerColors.MediumGray
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = dangerLevel.name,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = when(dangerLevel) {
+                            DangerLevel.SAFE -> VoyagerColors.SafeGreen
+                            DangerLevel.MODERATE -> Color(0xFFFF9800)
+                            DangerLevel.HIGH -> VoyagerColors.EmergencyRed
+                            DangerLevel.CRITICAL -> Color(0xFF8B0000)
+                        }
+                    )
+                }
 
-                Text(
-                    text = "You're Offline",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.SemiBold
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when(dangerLevel) {
+                                DangerLevel.SAFE -> VoyagerColors.SafeGreen
+                                DangerLevel.MODERATE -> Color(0xFFFF9800)
+                                DangerLevel.HIGH -> VoyagerColors.EmergencyRed
+                                DangerLevel.CRITICAL -> Color(0xFF8B0000)
+                            }
+                        )
                 )
             }
 
-            Text(
-                text = when {
-                    hasSmsCapability && hasLastKnownLocation ->
-                        "✓ SMS emergency alerts will work\n✓ Last known location available\n✓ Local alarm functional"
-                    hasLastKnownLocation ->
-                        "✓ Last known location available\n✓ Emergency calls will work\n⚠ Enable SMS permission for alerts"
-                    else ->
-                        "⚠ Limited functionality\n✓ Emergency calls will work\n⚠ Location data unavailable"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+            Spacer(modifier = Modifier.height(20.dp))
+
+            HorizontalDivider(
+                color = VoyagerColors.MediumGray.copy(alpha = 0.2f),
+                thickness = 1.dp
             )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Emergency Contacts Count
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Emergency Contacts",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = VoyagerColors.MediumGray
+                )
+                Text(
+                    text = "$contactsCount/5 configured",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = VoyagerColors.DarkCharcoal
+                )
+            }
+
+            lastEvent?.let { event ->
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Location from last event
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.LocationOn,
+                        contentDescription = "Location",
+                        tint = VoyagerColors.DarkCharcoal,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Last Known Location",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = VoyagerColors.MediumGray
+                        )
+                        Text(
+                            text = "${event.latitude}, ${event.longitude}",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Medium
+                            ),
+                            color = VoyagerColors.DarkCharcoal
+                        )
+                        Text(
+                            text = "Source: ${event.locationSource.name} • ${event.locationAccuracy}m",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = VoyagerColors.MediumGray
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // System status
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(VoyagerColors.SafeGreen.copy(alpha = 0.1f))
+                    .padding(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(VoyagerColors.SafeGreen)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "📡 SMS delivery active (works offline)",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = VoyagerColors.SafeGreen
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun DangerLevelCard(
-    dangerLevel: DangerLevel,
-    locationName: String?,
-    isLocationCached: Boolean = false,
-    modifier: Modifier = Modifier
+private fun SOSButton(
+    scale: Float,
+    onClick: () -> Unit,
+    isInProgress: Boolean,
+    enabled: Boolean
 ) {
-    val (color, label, icon) = when (dangerLevel) {
-        DangerLevel.SAFE -> Triple(SafeGreen, "Safe Area", Icons.Default.CheckCircle)
-        DangerLevel.MODERATE -> Triple(CautionYellow, "Caution Required", Icons.Default.Warning)
-        DangerLevel.HIGH -> Triple(DangerRed, "Danger Zone", Icons.Default.Error)
-        else -> Triple(TextSecondary, "Unknown", Icons.Default.Help)
-    }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = color.copy(alpha = 0.12f)
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(180.dp)
+            .scale(if (enabled) scale else 1f)
+            .shadow(
+                elevation = 16.dp,
+                shape = CircleShape,
+                ambientColor = VoyagerColors.EmergencyRed.copy(alpha = 0.4f),
+                spotColor = VoyagerColors.EmergencyRed.copy(alpha = 0.4f)
+            ),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = VoyagerColors.EmergencyRed,
+            disabledContainerColor = VoyagerColors.MediumGray
         ),
-        shape = MaterialTheme.shapes.medium
+        shape = CircleShape,
+        contentPadding = PaddingValues(0.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = color,
-                modifier = Modifier.size(32.dp)
-            )
-
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = color,
-                    fontWeight = FontWeight.SemiBold
+            if (isInProgress) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = Color.White
                 )
-
-                if (locationName != null) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = locationName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
-                        )
-
-                        if (isLocationCached) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = "Cached location",
-                                tint = TextTertiary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "SENDING",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color.White
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Phone,
+                    contentDescription = "SOS",
+                    tint = Color.White,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "SOS",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = Color.White
+                )
+                Text(
+                    text = "Alert Contacts",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun EmergencyActionsRow(
+    contacts: List<EmergencyContact>
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        EmergencyActionCard(
+            title = "View Contacts",
+            icon = "👥",
+            subtitle = "${contacts.size} contacts",
+            onClick = { /* Navigate to contacts */ },
+            modifier = Modifier.weight(1f)
+        )
+
+        if (contacts.isNotEmpty()) {
+            EmergencyActionCard(
+                title = "Call ${contacts.first().name}",
+                icon = "📞",
+                subtitle = "Primary contact",
+                onClick = { /* Call first contact */ },
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            EmergencyActionCard(
+                title = "Add Contacts",
+                icon = "➕",
+                subtitle = "Get started",
+                onClick = { /* Add contacts */ },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuickActionCard(
-    icon: ImageVector,
-    label: String,
+private fun EmergencyActionCard(
+    title: String,
+    icon: String,
+    subtitle: String = "",
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isOfflineCapable: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     Card(
         onClick = onClick,
         modifier = modifier.height(100.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = SurfaceElevated
+            containerColor = VoyagerColors.WarmIvory
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
-        ),
-        shape = MaterialTheme.shapes.medium
+        )
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = VoyagerYellow,
-                    modifier = Modifier.size(28.dp)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = icon,
+                fontSize = 28.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = VoyagerColors.DarkCharcoal,
+                textAlign = TextAlign.Center,
+                maxLines = 2
+            )
+            if (subtitle.isNotEmpty()) {
                 Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TextPrimary,
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = VoyagerColors.MediumGray,
                     textAlign = TextAlign.Center
                 )
             }
+        }
+    }
+}
 
-            // Offline capable badge
-            if (isOfflineCapable) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = SafeGreen
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SignalCellular4Bar,
-                        contentDescription = "Works offline",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .size(12.dp)
+@Composable
+private fun PermissionRequestScreen(
+    onRequestPermissions: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        VoyagerColors.CreamBackground,
+                        VoyagerColors.LightBeige
                     )
+                )
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = VoyagerColors.WarmIvory
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = VoyagerColors.EmergencyRed,
+                    modifier = Modifier.size(64.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    "Permissions Required",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "Emergency Mode requires:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = VoyagerColors.MediumGray
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PermissionItem("📍 Location", "For sending your GPS coordinates")
+                Spacer(modifier = Modifier.height(8.dp))
+                PermissionItem("💬 SMS", "For offline emergency alerts")
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onRequestPermissions,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VoyagerColors.EmergencyRed
+                    )
+                ) {
+                    Text("Grant Permissions")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(onClick = onCancel) {
+                    Text("Cancel")
                 }
             }
         }
@@ -503,147 +630,88 @@ fun QuickActionCard(
 }
 
 @Composable
-fun EmergencyContactsPreview(
-    contacts: List<EmergencyContact>,
-    onManageClick: () -> Unit,
-    onCallContact: (EmergencyContact) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+private fun PermissionItem(title: String, description: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Text(title, fontSize = 20.sp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
             Text(
-                text = "Emergency Contacts",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
-                fontWeight = FontWeight.SemiBold
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = VoyagerColors.MediumGray
             )
-
-            TextButton(onClick = onManageClick) {
-                Text("Manage")
-            }
         }
+    }
+}
 
-        if (contacts.isEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = DangerRed.copy(alpha = 0.1f)
-                ),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Warning",
-                        tint = DangerRed
+@Composable
+private fun NoContactsScreen(
+    onAddContacts: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        VoyagerColors.CreamBackground,
+                        VoyagerColors.LightBeige
                     )
-                    Text(
-                        text = "No emergency contacts set",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = DangerRed,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Add contacts to enable SOS alerts",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        } else {
-            contacts.take(3).forEach { contact ->
-                EmergencyContactCard(
-                    contact = contact,
-                    onCall = { onCallContact(contact) }
                 )
-            }
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = VoyagerColors.WarmIvory
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("👥", fontSize = 64.sp)
 
-            if (contacts.size > 3) {
-                TextButton(
-                    onClick = onManageClick,
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    "No Emergency Contacts",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "Add up to 5 emergency contacts to enable SOS alerts",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = VoyagerColors.MediumGray,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onAddContacts,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("View all ${contacts.size} contacts")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EmergencyContactCard(
-    contact: EmergencyContact,
-    onCall: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = SurfaceElevated
-        ),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Surface(
-                    shape = MaterialTheme.shapes.large,
-                    color = VoyagerYellow.copy(alpha = 0.2f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = contact.name,
-                        tint = VoyagerYellow,
-                        modifier = Modifier
-                            .padding(10.dp)
-                            .size(24.dp)
-                    )
+                    Text("Add Emergency Contacts")
                 }
 
-                Column {
-                    Text(
-                        text = contact.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = contact.relationship,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-            }
+                Spacer(modifier = Modifier.height(8.dp))
 
-            IconButton(onClick = onCall) {
-                Icon(
-                    imageVector = Icons.Default.Phone,
-                    contentDescription = "Call ${contact.name}",
-                    tint = SafeGreen
-                )
+                TextButton(onClick = onCancel) {
+                    Text("Cancel")
+                }
             }
         }
     }

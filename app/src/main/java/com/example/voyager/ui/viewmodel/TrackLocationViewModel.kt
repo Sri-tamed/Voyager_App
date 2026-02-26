@@ -24,7 +24,7 @@ data class TrackLocationUiState(
     val isRouteVisible: Boolean = false,
     val distanceKm: Double? = null,
     val trackingExpired: Boolean = false,
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     // List of (lat, lon) along the route polyline
     val routePoints: List<Pair<Double, Double>> = emptyList()
 )
@@ -53,47 +53,57 @@ class TrackLocationViewModel(
                 try {
                     val response = repository.fetchTargetLocation(userId)
 
-                    if (response.code() == 404) {
-                        println("TrackLocationViewModel: tracking expired (404)")
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                trackingExpired = true,
-                                targetLocation = null
-                            )
-                        }
-                        break
-                    }
-
-                    if (response.isSuccessful) {
-                        val body = response.body()
-                        if (body?.success == true && body.data != null) {
-                            println("TrackLocationViewModel: location=${body.data.latitude},${body.data.longitude}")
+                    when {
+                        response.code() == 404 -> {
+                            println("TrackLocationViewModel: tracking expired (404)")
                             _uiState.update {
-                                val updated = it.copy(
-                                    targetLocation = body.data,
-                                    isLoading = false
-                                )
-                                updated.copy(
-                                    distanceKm = computeDistanceKm(updated.viewerLocation, updated.targetLocation)
+                                it.copy(
+                                    isLoading = false,
+                                    trackingExpired = true,
+                                    targetLocation = null
                                 )
                             }
+                            break
                         }
-                    } else {
-                        println("TrackLocationViewModel: backend error code=${response.code()}")
+
+                        response.isSuccessful -> {
+                            val body = response.body()
+                            if (body?.success == true && body.data != null) {
+                                println("TrackLocationViewModel: location=${body.data.latitude},${body.data.longitude}")
+                                _uiState.update { current ->
+                                    current.copy(
+                                        targetLocation = body.data,
+                                        isLoading = false,
+                                        distanceKm = computeDistanceKm(
+                                            current.viewerLocation,
+                                            body.data
+                                        )
+                                    )
+                                }
+                            } else {
+                                _uiState.update { it.copy(isLoading = false) }
+                            }
+                        }
+
+                        else -> {
+                            println("TrackLocationViewModel: backend error code=${response.code()}")
+                            _uiState.update { it.copy(isLoading = false) }
+                        }
                     }
+
                 } catch (e: IOException) {
                     println("TrackLocationViewModel: network error=${e.message}")
+                    _uiState.update { it.copy(isLoading = false) }
                 } catch (e: HttpException) {
                     println("TrackLocationViewModel: http error=${e.code()} message=${e.message()}")
+                    _uiState.update { it.copy(isLoading = false) }
                 } catch (e: Exception) {
                     println("TrackLocationViewModel: unknown error=${e.message}")
+                    _uiState.update { it.copy(isLoading = false) }
                 }
 
                 delay(5_000L)
             }
-
-            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
@@ -101,16 +111,17 @@ class TrackLocationViewModel(
      * Called by the Fragment when viewer GPS location changes.
      */
     fun updateViewerLocation(lat: Double, lon: Double) {
-        _uiState.update {
-            val updated = it.copy(viewerLocation = lat to lon)
-            updated.copy(
-                distanceKm = computeDistanceKm(updated.viewerLocation, updated.targetLocation)
+        _uiState.update { current ->
+            val newViewerLocation = lat to lon
+            current.copy(
+                viewerLocation = newViewerLocation,
+                distanceKm = computeDistanceKm(newViewerLocation, current.targetLocation)
             )
         }
     }
 
     /**
-     * Toggle route visibility and, when turning on, load OSRM route if both
+     * Toggle route visibility. When turning on, load OSRM route if both
      * endpoints are available.
      */
     fun toggleRoute() {
@@ -120,9 +131,7 @@ class TrackLocationViewModel(
         _uiState.update {
             it.copy(
                 isRouteVisible = newVisible,
-                // Clear existing route when toggled off
-                routePoints = if (newVisible) it.routePoints else emptyList(),
-                distanceKm = if (newVisible) it.distanceKm else it.distanceKm
+                routePoints = if (newVisible) it.routePoints else emptyList()
             )
         }
 
@@ -143,17 +152,12 @@ class TrackLocationViewModel(
     ) {
         viewModelScope.launch {
             println("TrackLocationViewModel.loadRoute viewer=($viewerLat,$viewerLon) target=($targetLat,$targetLon)")
-            when (val result = repository.fetchRoute(viewerLat, viewerLon, targetLat, targetLon)) {
-                is Result.Success -> {
-                    val points = result.getOrNull().orEmpty()
-                    _uiState.update {
-                        it.copy(routePoints = points)
-                    }
-                }
-
-                else -> {
-                    println("TrackLocationViewModel.loadRoute failed: ${result.exceptionOrNull()?.message}")
-                }
+            val result = repository.fetchRoute(viewerLat, viewerLon, targetLat, targetLon)
+            if (result.isSuccess) {
+                val points = result.getOrNull().orEmpty()
+                _uiState.update { it.copy(routePoints = points) }
+            } else {
+                println("TrackLocationViewModel.loadRoute failed: ${result.exceptionOrNull()?.message}")
             }
         }
     }
@@ -182,5 +186,9 @@ class TrackLocationViewModel(
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return earthRadiusKm * c
     }
-}
 
+    override fun onCleared() {
+        super.onCleared()
+        pollingJob?.cancel()
+    }
+}

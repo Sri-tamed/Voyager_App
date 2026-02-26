@@ -1,6 +1,9 @@
 package com.example.voyager.ui.screens.emergency
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +52,8 @@ fun EmergencyScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var showContacts by remember { mutableStateOf(false) }
 
     // Permission handling
     val permissionsState = rememberMultiplePermissionsState(
@@ -62,7 +68,55 @@ fun EmergencyScreen(
         viewModel.updatePermissionsState(permissionsState.allPermissionsGranted)
     }
 
-    // Show permission request if needed
+    // Bug 1 fix: Collect one-shot UI events from the ViewModel and launch intents.
+    // Uses LocalContext.current (Compose best practice) and includes try/catch + println logs.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            try {
+                when (event) {
+                    is EmergencyUiEvent.OpenSmsApp -> {
+                        println("EmergencyScreen: OpenSmsApp phones=${event.phoneNumbers.size}")
+                        val smsUri = if (event.phoneNumbers.isNotEmpty()) {
+                            // ACTION_SENDTO + sms:NUMBER is the most reliable way to open SMS app with recipients.
+                            Uri.parse("smsto:${event.phoneNumbers.joinToString(separator = ";")}")
+                        } else {
+                            Uri.parse("smsto:")
+                        }
+
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = smsUri
+                            putExtra("sms_body", event.message)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        ContextCompat.startActivity(context, intent, null)
+                    }
+
+                    is EmergencyUiEvent.OpenDialer -> {
+                        println("EmergencyScreen: OpenDialer number=${event.phoneNumber}")
+                        val intent = Intent(Intent.ACTION_DIAL).apply {
+                            data = Uri.parse("tel:${event.phoneNumber}")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        ContextCompat.startActivity(context, intent, null)
+                    }
+                }
+            } catch (e: Exception) {
+                // Keep UI intact; just log for debugging.
+                println("EmergencyScreen: failed to handle event=$event error=${e.message}")
+            }
+        }
+    }
+
+    // If user is managing contacts from within emergency mode, show that screen.
+    if (showContacts) {
+        EmergencyContactsScreen(
+            emergencyManager = emergencyManager,
+            onBack = { showContacts = false }
+        )
+        return
+    }
+
+    // Show permission request if needed for main emergency mode
     if (!permissionsState.allPermissionsGranted) {
         PermissionRequestScreen(
             onRequestPermissions = { permissionsState.launchMultiplePermissionRequest() },
@@ -74,13 +128,18 @@ fun EmergencyScreen(
     // Main Emergency UI
     if (uiState.contacts.isEmpty()) {
         NoContactsScreen(
-            onAddContacts = { /* Navigate to add contacts */ },
+            // Bug: previously did nothing. Now opens inline contacts manager.
+            onAddContacts = { showContacts = true },
             onCancel = onCancel
         )
     } else {
         EmergencyModeScreenIntegrated(
             uiState = uiState,
             onSosClick = { viewModel.triggerSos(DangerLevel.HIGH) },
+            // Bug 1 fix: Wire buttons to real ViewModel handlers.
+            onShareLocation = { viewModel.shareLocation() },
+            onCallPrimaryContact = { contact -> viewModel.callContact(contact) },
+            onManageContacts = { showContacts = true },
             onCancel = {
                 viewModel.stopEmergencyMode()
                 onCancel()
@@ -93,8 +152,16 @@ fun EmergencyScreen(
 private fun EmergencyModeScreenIntegrated(
     uiState: EmergencyUiState,
     onSosClick: () -> Unit,
+    onShareLocation: () -> Unit,
+    onCallPrimaryContact: (EmergencyContact) -> Unit,
+    onManageContacts: () -> Unit,
     onCancel: () -> Unit
 ) {
+    // Bug 2 fix: Debug log to verify emergency-mode state is correct.
+    LaunchedEffect(uiState.isEmergencyModeActive) {
+        println("EmergencyModeScreenIntegrated: isEmergencyModeActive=${uiState.isEmergencyModeActive}")
+    }
+
     // Pulsing animation for SOS button
     val infiniteTransition = rememberInfiniteTransition(label = "sosButton")
     val scale by infiniteTransition.animateFloat(
@@ -153,7 +220,10 @@ private fun EmergencyModeScreenIntegrated(
 
             // Emergency Actions
             EmergencyActionsRow(
-                contacts = uiState.contacts.take(2)
+                contacts = uiState.contacts,
+                onShareLocation = onShareLocation,
+                onCallPrimaryContact = onCallPrimaryContact,
+                onManageContacts = onManageContacts
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -184,6 +254,11 @@ private fun EmergencyModeScreenIntegrated(
 
 @Composable
 private fun EmergencyHeader(isActive: Boolean) {
+    // Bug 2 fix: log state changes to verify correct UI binding.
+    LaunchedEffect(isActive) {
+        println("EmergencyHeader: isActive=$isActive")
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -459,26 +534,35 @@ private fun SOSButton(
 
 @Composable
 private fun EmergencyActionsRow(
-    contacts: List<EmergencyContact>
+    contacts: List<EmergencyContact>,
+    onShareLocation: () -> Unit,
+    onCallPrimaryContact: (EmergencyContact) -> Unit,
+    onManageContacts: () -> Unit
 ) {
+    val primary = contacts
+        .sortedWith(compareByDescending<EmergencyContact> { it.isPrimary }.thenBy { it.position })
+        .firstOrNull()
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         EmergencyActionCard(
-            title = "View Contacts",
-            icon = "👥",
-            subtitle = "${contacts.size} contacts",
-            onClick = { /* Navigate to contacts */ },
+            // Bug 1 fix: Share Location button now actually does something meaningful.
+            title = "Share Location",
+            icon = "📍",
+            subtitle = "Send SMS",
+            onClick = onShareLocation,
             modifier = Modifier.weight(1f)
         )
 
-        if (contacts.isNotEmpty()) {
+        if (primary != null) {
             EmergencyActionCard(
-                title = "Call ${contacts.first().name}",
+                // Bug 1 fix: Call Contact button now opens dialer with the primary contact number.
+                title = "Call ${primary.name}",
                 icon = "📞",
                 subtitle = "Primary contact",
-                onClick = { /* Call first contact */ },
+                onClick = { onCallPrimaryContact(primary) },
                 modifier = Modifier.weight(1f)
             )
         } else {
@@ -486,7 +570,7 @@ private fun EmergencyActionsRow(
                 title = "Add Contacts",
                 icon = "➕",
                 subtitle = "Get started",
-                onClick = { /* Add contacts */ },
+                onClick = { onManageContacts() },
                 modifier = Modifier.weight(1f)
             )
         }

@@ -3,11 +3,20 @@ package com.example.voyager.emergency
 
 
 import android.content.Context
+import android.telephony.SmsManager
+import com.example.voyager.data.local.cache.LastLocationCache
+import com.example.voyager.data.local.datastore.EmergencyContactsStore
 import com.example.voyager.data.model.DangerLevel
 import com.example.voyager.data.model.EmergencyContact
 import com.example.voyager.data.model.EmergencyEvent
+import com.example.voyager.emergency.data.EmergencyDatabase
+import com.example.voyager.emergency.data.LocationSource as DbLocationSource
+import com.example.voyager.emergency.data.DangerLevel as DbDangerLevel
+import com.example.voyager.emergency.data.EmergencyEvent as DbEmergencyEvent
+import com.example.voyager.emergency.data.DeliveryStatus as DbDeliveryStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 
 /**
  * Emergency Manager - Handles all emergency operations
@@ -39,8 +48,10 @@ class EmergencyManager private constructor(
         }
     }
 
-    // TODO: Replace with actual Room database
-    private val contactsFlow = flowOf<List<EmergencyContact>>(emptyList())
+    // Backing flow for contacts — wired to EmergencyContactsStore (offline-first).
+    // This powers EmergencyContactsScreen and the Emergency UI.
+    private val contactsStore by lazy { EmergencyContactsStore(context) }
+    private val contactsFlow: Flow<List<EmergencyContact>> = contactsStore.getContacts()
     private val eventsFlow = flowOf<List<EmergencyEvent>>(emptyList())
 
     /**
@@ -75,14 +86,115 @@ class EmergencyManager private constructor(
      * 6. Retry failed deliveries
      */
     suspend fun triggerSos(dangerLevel: DangerLevel) {
-        // TODO: Implement SOS logic
-        // 1. Get location from LocationManager
-        // 2. Get contacts from database
-        // 3. Send SMS via SmsManager (works offline!)
-        // 4. Start EmergencyService (foreground service)
-        // 5. Save event to database
+        // Bug 3 fix: implement basic SOS SMS sending + event persistence.
+        //
+        // NOTE:
+        // - Permissions (SMS/Location) are handled elsewhere per your note.
+        // - Location is taken from LastLocationCache as an offline-friendly fallback.
+        //   TODO: Replace with fused provider / real-time tracking when available.
+        //
+        // Steps:
+        // 1) Load emergency contacts (DataStore-based, offline-first)
+        // 2) Get last known cached location (or fallback placeholder)
+        // 3) Send SMS to all contacts via SmsManager
+        // 4) Save event into the Room emergency DB (basic history)
+        try {
+            println("🚨 SOS TRIGGERED - Danger Level: $dangerLevel")
 
-        println("🚨 SOS TRIGGERED - Danger Level: $dangerLevel")
+            val contactsStore = EmergencyContactsStore(context)
+            val contacts = contactsStore.getContacts().first()
+
+            if (contacts.isEmpty()) {
+                println("EmergencyManager.triggerSos(): no emergency contacts configured")
+                // Still save an event (with fallback coordinates) so user can debug history.
+            }
+
+            val cache = LastLocationCache(context)
+            val cached = cache.get()
+
+            val lat = cached?.latitude ?: 0.0
+            val lon = cached?.longitude ?: 0.0
+            val mapsUrl = "https://maps.google.com/?q=$lat,$lon"
+
+            val smsMessage = """
+                🚨 EMERGENCY - Voyager App
+                I need help! My location: $mapsUrl
+            """.trimIndent()
+
+            println("EmergencyManager.triggerSos(): contacts=${contacts.size} lat=$lat lon=$lon cache=${cached != null}")
+
+            // Send SMS to all emergency contacts (best-effort; continue on failures)
+            val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                context.getSystemService(SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            }
+
+            var sentCount = 0
+            var failedCount = 0
+
+            contacts.forEach { contact ->
+                val number = contact.phoneNumber.trim()
+                if (number.isBlank()) {
+                    failedCount += 1
+                    return@forEach
+                }
+                try {
+                    val parts = smsManager.divideMessage(smsMessage)
+                    smsManager.sendMultipartTextMessage(
+                        number,
+                        null,
+                        parts,
+                        null,
+                        null
+                    )
+                    sentCount += 1
+                    println("EmergencyManager.triggerSos(): SMS queued -> ${contact.name} ($number)")
+                } catch (e: Exception) {
+                    failedCount += 1
+                    println("EmergencyManager.triggerSos(): SMS failed -> ${contact.name} ($number) error=${e.message}")
+                }
+            }
+
+            // Save event to Room database (basic history)
+            try {
+                val db = EmergencyDatabase.getDatabase(context)
+                val dao = db.emergencyDao()
+
+                val dbDanger = when (dangerLevel) {
+                    DangerLevel.SAFE -> DbDangerLevel.LOW
+                    DangerLevel.MODERATE -> DbDangerLevel.MEDIUM
+                    DangerLevel.HIGH -> DbDangerLevel.HIGH
+                    DangerLevel.CRITICAL -> DbDangerLevel.CRITICAL
+                }
+
+                val source = if (cached != null) DbLocationSource.LAST_KNOWN else DbLocationSource.FALLBACK
+                val status = when {
+                    sentCount > 0 && failedCount == 0 -> DbDeliveryStatus.SMS_SENT
+                    sentCount > 0 && failedCount > 0 -> DbDeliveryStatus.PARTIALLY_SENT
+                    else -> DbDeliveryStatus.FAILED
+                }
+
+                val event = DbEmergencyEvent(
+                    latitude = lat,
+                    longitude = lon,
+                    dangerLevel = dbDanger,
+                    locationAccuracy = cached?.accuracy ?: 0f,
+                    locationSource = source,
+                    deliveryStatus = status
+                )
+
+                dao.insertEvent(event)
+                println("EmergencyManager.triggerSos(): event saved status=$status")
+            } catch (e: Exception) {
+                // Non-fatal: SMS may have been sent even if saving fails.
+                println("EmergencyManager.triggerSos(): failed to save event: ${e.message}")
+            }
+        } catch (e: Exception) {
+            println("EmergencyManager.triggerSos(): fatal error: ${e.message}")
+            throw e
+        }
     }
 
     /**
@@ -90,35 +202,69 @@ class EmergencyManager private constructor(
      * Maximum 5 contacts allowed
      */
     suspend fun addEmergencyContact(name: String, phoneNumber: String) {
-        // TODO: Implement
-        // 1. Validate input
-        // 2. Check if < 5 contacts exist
-        // 3. Insert into Room database
-        // 4. Update priority order
+        // Basic implementation backed by EmergencyContactsStore (DataStore).
+        // This makes the EmergencyContactsScreen interactive instead of "frozen".
+        try {
+            val trimmedName = name.trim()
+            val trimmedPhone = phoneNumber.trim()
 
-        println("📇 Adding contact: $name - $phoneNumber")
+            if (trimmedName.isBlank() || trimmedPhone.isBlank()) {
+                println("addEmergencyContact(): invalid input")
+                return
+            }
+
+            val current = contactsStore.getContacts().first()
+            if (current.size >= 5) {
+                println("addEmergencyContact(): already have 5 contacts")
+                return
+            }
+
+            val nextId = (current.maxOfOrNull { it.id } ?: 0) + 1
+            val newContact = EmergencyContact(
+                id = nextId,
+                name = trimmedName,
+                phoneNumber = trimmedPhone,
+                relationship = "",
+                isPrimary = current.isEmpty(), // First contact becomes primary by default
+                position = current.size
+            )
+
+            val updated = current + newContact
+            contactsStore.saveContacts(updated)
+            println("📇 Added emergency contact: $trimmedName - $trimmedPhone (total=${updated.size})")
+        } catch (e: Exception) {
+            println("addEmergencyContact() failed: ${e.message}")
+        }
     }
 
     /**
      * Delete emergency contact from database
      */
     suspend fun deleteEmergencyContact(contact: EmergencyContact) {
-        // TODO: Implement
-        // 1. Delete from Room database
-        // 2. Reorder remaining contacts
+        try {
+            val current = contactsStore.getContacts().first()
+            val updated = current.filter { it.id != contact.id }
+                .mapIndexed { index, c -> c.copy(position = index) }
 
-        println("🗑️ Deleting contact: ${contact.name}")
+            contactsStore.saveContacts(updated)
+            println("🗑️ Deleted emergency contact: ${contact.name} (remaining=${updated.size})")
+        } catch (e: Exception) {
+            println("deleteEmergencyContact() failed: ${e.message}")
+        }
     }
 
     /**
      * Reorder contacts (for drag and drop priority)
      */
     suspend fun reorderContacts(contacts: List<EmergencyContact>) {
-        // TODO: Implement
-        // 1. Update priority field for each contact
-        // 2. Save to database
-
-        println("🔄 Reordering ${contacts.size} contacts")
+        try {
+            // Persist the passed order as positions 0..n.
+            val reordered = contacts.mapIndexed { index, c -> c.copy(position = index) }
+            contactsStore.saveContacts(reordered)
+            println("🔄 Reordered ${contacts.size} contacts")
+        } catch (e: Exception) {
+            println("reorderContacts() failed: ${e.message}")
+        }
     }
 
     /**

@@ -21,7 +21,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.voyager.data.model.DangerLevel
-import com.example.voyager.ui.screens.EmergencyModeScreen
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+import com.example.voyager.di.EmergencyModule
+import com.example.voyager.ui.screens.emergency.EmergencyScreen
 import com.example.voyager.ui.screens.MapScreen
 import com.example.voyager.ui.screens.ProfileScreen
 import com.example.voyager.ui.screens.explore.HomeDashboard
@@ -78,7 +81,12 @@ fun VoyagerNavGraph(
         // EMERGENCY
         // ----------------------------------------------------------
         composable(Screens.Emergency.route) {
-            EmergencyModeScreen(
+            // Wire up the new integrated EmergencyScreen with real SOS + buttons.
+            val context = LocalContext.current
+            val emergencyManager = remember { EmergencyModule.provideEmergencyManager(context) }
+
+            EmergencyScreen(
+                emergencyManager = emergencyManager,
                 onCancel = { navController.popBackStack() }
             )
         }

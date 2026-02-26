@@ -66,8 +66,8 @@ Emergency module supports:
   "type": "SOS",
   "timestamp": "2026-01-18T10:30:00",
   "location": {
-    "lat": 22.5726,
-    "lng": 88.3639
+    "lat": 22.xyz,
+    "lng": 88.abc
   },
   "message": "I am in danger / lost. Please help."
 }

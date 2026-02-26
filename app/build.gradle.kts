@@ -97,6 +97,10 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.1.0")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
 
+    // Networking - Retrofit + Gson (for backend + OSRM APIs)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
     // Coil for Image Loading
     implementation("io.coil-kt:coil-compose:2.5.0")
 

@@ -16,8 +16,8 @@ Travelers often face problems like:
 
 Voyager addresses these pain points using:
 - Map-based navigation  
-✅ Offline last-known location fallback  
-✅ Emergency mode + SOS alert logic  
+-Offline last-known location fallback  
+-Emergency mode + SOS alert logic  
 ✅ Beep-based alert trigger for danger zones  
 
 ---

@@ -18,7 +18,7 @@ Voyager addresses these pain points using:
 - Map-based navigation  
 -Offline last-known location fallback  
 -Emergency mode + SOS alert logic  
-✅ Beep-based alert trigger for danger zones  
+-Beep-based alert trigger for danger zones  
 
 ---
 
